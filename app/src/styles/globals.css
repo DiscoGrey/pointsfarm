@@ -1,0 +1,14 @@
+@import 'text-security';
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+.mask-input {
+  -webkit-text-security: disc;
+}
+
+@supports not (-webkit-text-security: disc) {
+  .mask-input {
+    font-family: text-security-disc;
+  }
+}
