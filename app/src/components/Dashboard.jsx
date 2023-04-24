@@ -17,15 +17,22 @@ const INITIAL_ARGS = {
 const INITIAL_STATES = {
   isGardenerRunning: false,
   isGardenerPermission: false,
+  lastGardenerCsvUpload: null,
   GardenerArg: INITIAL_ARGS,
+  isGardenerAutoRunning: false,
+  isGardenerAutoPermission: false,
+  lastGardenerAutoCsvUpload: false,
   isFarmorRunning: false,
   isFarmorPermission: false,
+  lastFarmorCsvUpload: null,
   FarmorArg: INITIAL_ARGS,
   isPurchaserRunning: false,
   isPurchaserPermission: false,
+  lastPurchaserCsvUpload: null,
   PurchaserArg: INITIAL_ARGS,
   isAcceptorRunnung: false,
   isAcceptorPermission: false,
+  lastAcceptorCsvUpload: null,
   AcceptorArg: INITIAL_ARGS,
   status: true
 }
@@ -50,6 +57,7 @@ const Dashboard = ({ setSigned }) => {
   const walletAddress = '0xceed8bfa1c058a965bc...example...055d10170798669294871a3'
 
   const getArgs = (moduleName) => switches[moduleName + 'Arg'] ?? INITIAL_ARGS
+  const getCsvUpload = (moduleName) => switches['last' + moduleName + 'CsvUpload'] ?? null
 
   socket.on('message', data => {
     if (data.code === "3") {
@@ -82,17 +90,23 @@ const Dashboard = ({ setSigned }) => {
   }, [switches.status])
 
   const handleChange = async (e) => {
-    let data = { code: '14', message: e.target.name }
+    const moduleName = e.target.name
+    let data = { code: '14', message: moduleName }
 
     if (e.target.checked) {
-      if (!file || e.target.name !== module) return showMessage('Please select a file')
+      let csvFile = ""
+      if (moduleName === module) {
+        if (file) { csvFile = file.toString('base64') } 
+        else if (!getCsvUpload(moduleName)) return showMessage('Please select a file')
+      } 
+      else if (!getCsvUpload(moduleName)) return showMessage('Please select a file')
 
       data = {
         code: '13',
         message: {
-          moduleName: e.target.name,
-          csvFile: file.toString('base64'),
-          jsonParams: JSON.stringify({ ...getArgs(e.target.name) })
+          moduleName,
+          csvFile,
+          jsonParams: JSON.stringify({ ...getArgs(moduleName) })
         }
       }
     }
@@ -100,6 +114,8 @@ const Dashboard = ({ setSigned }) => {
     let _switches = { ...switches }
     _switches[e.target.dataset.value] = e.target.checked
     setSwitches(_switches)
+
+    //return console.log(data)
 
     socket.emit("message", data)
   }
@@ -139,7 +155,10 @@ const Dashboard = ({ setSigned }) => {
             step: function(row, parser) {
               if (!allKeyPresent) {
                   const keys = Object.keys(row.data)
-                  if(!keys.includes('Collection')) parser.abort()
+                  if(!keys.includes('Collection')) {
+                    parser.abort()
+                    return showMessage('Invalid file format')
+                  }
 
                   allKeyPresent = true
               }
@@ -167,11 +186,7 @@ const Dashboard = ({ setSigned }) => {
     <>
       <div className="m-8 w-full max-w-5xl relative">
         <div className="h-4 mb-2 absolute top-2 sm:right-8 right-4">
-          {
-            errorMessage && (
-              <div className="text-red-600 font-semibold text-sm">{errorMessage}</div>
-            )
-          }
+          { errorMessage && <div className="text-red-600 font-semibold text-sm">{errorMessage}</div> }
           </div>
         <form className="bg-white shadow-lg rounded sm:px-8 px-4 pt-6 pb-8">
           <h1 className="text-2xl font-bold">Dashboard</h1>
@@ -183,7 +198,7 @@ const Dashboard = ({ setSigned }) => {
               <tr className="border-b dark:border-neutral-500">
                 <td className="whitespace-nowrap border-r px-4 py-2 dark:border-neutral-500 font-medium text-xl text-left flex flex-row justify-between items-center">
                   <span>Gardener</span>
-                  <label className={`relative inline-flex items-center ${switches.isGardenerPermission? 'cursor-pointer': 'cursor-not-allowed'}`}>
+                  <label className={`relative inline-flex items-center ${switches.isGardenerPermission ? 'cursor-pointer' : 'cursor-not-allowed'}`}>
                     <input
                       type="checkbox"
                       name="Gardener"
@@ -198,7 +213,7 @@ const Dashboard = ({ setSigned }) => {
                 </td>
                 <td className="whitespace-nowrap border-r px-4 py-2 dark:border-neutral-500" style={{minWidth: '60px'}}>
                   <div className="flex justify-center">
-                    <button onClick={handleSelectFile} disabled={!switches.isGardenerPermission} className={`${switches.isGardenerPermission? 'cursor-pointer': 'cursor-not-allowed'}`}>
+                    <button onClick={handleSelectFile} disabled={!switches.isGardenerPermission} className={`relative group ${switches.isGardenerPermission? 'cursor-pointer': 'cursor-not-allowed'}`}>
                       <Image
                         priority
                         src={iconCSV}
@@ -208,6 +223,11 @@ const Dashboard = ({ setSigned }) => {
                         name="Gardener" 
                         style={file && module === 'Gardener' ? activeIcon : {}}
                       />
+                      <div className={`absolute inline-flex items-center justify-center w-3 h-3 text-xs font-bold text-white ${switches.lastGardenerCsvUpload ? "bg-green-800" : "bg-red-500"} border-2 border-white rounded-full -top-1 -right-1 dark:border-gray-900`} />
+                      {
+                        switches.lastGardenerCsvUpload && 
+                        <span className="absolute z-20 -top-5 left-7 scale-0 rounded bg-gray-800 p-2 text-xs text-white group-hover:scale-100">{switches.lastGardenerCsvUpload}</span>
+                      }
                     </button>
                   </div>
                 </td>
@@ -240,7 +260,11 @@ const Dashboard = ({ setSigned }) => {
                 </td>
                 <td className="whitespace-nowrap border-r px-4 py-2 dark:border-neutral-500">
                   <div className="flex justify-center">
-                    <button onClick={handleSelectFile} disabled={!switches.isFarmorPermission} className={`${switches.isFarmorPermission? 'cursor-pointer': 'cursor-not-allowed'}`}>
+                    <button 
+                      onClick={handleSelectFile} 
+                      disabled={!switches.isFarmorPermission} 
+                      className={`relative group ${switches.isFarmorPermission? 'cursor-pointer': 'cursor-not-allowed'}`}
+                    >
                       <Image
                         priority
                         src={iconCSV}
@@ -250,6 +274,11 @@ const Dashboard = ({ setSigned }) => {
                         name="Farmor" 
                         style={file && module === 'Farmor' ? activeIcon : {}}
                       />
+                      <div className={`absolute inline-flex items-center justify-center w-3 h-3 text-xs font-bold text-white ${switches.lastFarmorCsvUpload ? "bg-green-800" : "bg-red-500"} border-2 border-white rounded-full -top-1 -right-1 dark:border-gray-900`} />
+                      {
+                        switches.lastFarmorCsvUpload && 
+                        <span className="absolute z-20 -top-5 left-7 scale-0 rounded bg-gray-800 p-2 text-xs text-white group-hover:scale-100">{switches.lastFarmorCsvUpload}</span>
+                      }
                     </button>
                   </div>
                 </td>
@@ -277,7 +306,7 @@ const Dashboard = ({ setSigned }) => {
                 </td>
                 <td className="whitespace-nowrap border-r px-4 py-2 dark:border-neutral-500">
                   <div className="flex justify-center">
-                    <button onClick={handleSelectFile} disabled={!switches.isPurchaserPermission} className={`${switches.isPurchaserPermission? 'cursor-pointer': 'cursor-not-allowed'}`}>
+                    <button onClick={handleSelectFile} disabled={!switches.isPurchaserPermission} className={`relative group ${switches.isPurchaserPermission? 'cursor-pointer': 'cursor-not-allowed'}`}>
                       <Image
                         priority
                         src={iconCSV}
@@ -287,6 +316,11 @@ const Dashboard = ({ setSigned }) => {
                         name="Purchaser" 
                         style={file && module === 'Purchaser' ? activeIcon : {}}
                       />
+                      <div className={`absolute inline-flex items-center justify-center w-3 h-3 text-xs font-bold text-white ${switches.lastPurchaserCsvUpload ? "bg-green-800" : "bg-red-500"} border-2 border-white rounded-full -top-1 -right-1 dark:border-gray-900`} />
+                      {
+                        switches.lastPurchaserCsvUpload && 
+                        <span className="absolute z-20 -top-5 left-7 scale-0 rounded bg-gray-800 p-2 text-xs text-white group-hover:scale-100">{switches.lastPurchaserCsvUpload}</span>
+                      }
                     </button>
                   </div>
                 </td>
@@ -314,7 +348,7 @@ const Dashboard = ({ setSigned }) => {
                 </td>
                 <td className="whitespace-nowrap border-r px-4 py-2 dark:border-neutral-500">
                   <div className="flex justify-center">
-                    <button onClick={handleSelectFile} disabled={!switches.isAcceptorPermission} className={`${switches.isAcceptorPermission? 'cursor-pointer': 'cursor-not-allowed'}`}>
+                    <button onClick={handleSelectFile} disabled={!switches.isAcceptorPermission} className={`relative group ${switches.isAcceptorPermission? 'cursor-pointer': 'cursor-not-allowed'}`}>
                       <Image
                         priority
                         src={iconCSV}
@@ -324,6 +358,11 @@ const Dashboard = ({ setSigned }) => {
                         name="Acceptor" 
                         style={file && module === 'Acceptor' ? activeIcon : {}}
                       />
+                      <div className={`absolute inline-flex items-center justify-center w-3 h-3 text-xs font-bold text-white ${switches.lastAcceptorCsvUpload ? "bg-green-800" : "bg-red-500"} border-2 border-white rounded-full -top-1 -right-1 dark:border-gray-900`} />
+                      {
+                        switches.lastAcceptorCsvUpload && 
+                        <span className="absolute z-20 -top-5 left-7 scale-0 rounded bg-gray-800 p-2 text-xs text-white group-hover:scale-100">{switches.lastAcceptorCsvUpload}</span>
+                      }
                     </button>
                   </div>
                 </td>
